@@ -684,23 +684,23 @@
             </control>
 
             <control>
-                <description>Shift + Left CUE - Toggle quantize on/off (Deck1)</description>
-                <group>[Channel1]</group>
-                <key>PioneerDDJ400.toggleQuantize</key>
+                <description>Shift + Left CUE - Select next QuickEffect preset (Deck1)</description>
+                <group>[QuickEffectRack1_[Channel1]]</group>
+                <key>next_chain_preset</key>
                 <status>0x90</status>
                 <midino>0x68</midino>
                 <options>
-                    <Script-Binding/>
+                    <normal/>
                 </options>
             </control>
             <control>
-                <description>Shift + Right CUE - Toggle quantize on/off (Deck2)</description>
-                <group>[Channel2]</group>
-                <key>PioneerDDJ400.toggleQuantize</key>
+                <description>Shift + Right CUE - Select next QuickEffect preset (Deck2)</description>
+                <group>[QuickEffectRack1_[Channel2]]</group>
+                <key>next_chain_preset</key>
                 <status>0x91</status>
                 <midino>0x68</midino>
                 <options>
-                    <Script-Binding/>
+                    <normal/>
                 </options>
             </control>
 
@@ -889,6 +889,11 @@
                 </options>
             </control>
 
+            <!-- HEADPHONES MIXING knob is handled by DDJ-400 hardware, not Mixxx.
+                 The DDJ-400 blends channels 1-2 (Master) and 3-4 (Headphones) in hardware.
+                 Mixxx should always send pure PFL to channels 3-4, so we don't map this knob.
+            -->
+            <!--
             <control>
                 <description>HEADPHONES MIXING - rotate - Monitor Balance</description>
                 <group>[Master]</group>
@@ -909,6 +914,7 @@
                     <fourteen-bit-msb/>
                 </options>
             </control>
+            -->
 
             <control>
                 <description>HEADPHONES LEVEL - rotate - Headphone gain</description>
@@ -1052,8 +1058,8 @@
             </control>
 
             <control>
-                <description>BEAT FX LEVEL/DEPTH - rotate (MSB) - Adjust FX Level (mix) and BEAT FX Depth (meta) in the
-                    selected slot
+                <description>BEAT FX LEVEL/DEPTH - rotate (MSB) - Adjust the Effect Unit Super knob;
+                    hold SHIFT to adjust the Effect Unit mix
                 </description>
                 <group>[EffectRack1_EffectUnit1]</group>
                 <key>PioneerDDJ400.beatFxLevelDepthRotate</key>

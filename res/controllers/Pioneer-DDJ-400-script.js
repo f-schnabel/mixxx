@@ -23,12 +23,12 @@
 //                > RIGHT toggles focus between Effects 1, 2 and 3 rightward
 //                v DOWN loads next effect entry for focused Effect
 //                SHIFT + v UP loads previous effect entry for focused Effect
-//                LEVEL/DEPTH controls the Mix knob of the Effect Unit
-//                SHIFT + LEVEL/DEPTH controls the Meta knob of the focused Effect
+//                LEVEL/DEPTH controls the Super knob of the Effect Unit
+//                SHIFT + LEVEL/DEPTH controls the Mix knob of the Effect Unit
 //                ON/OFF toggles focused effect slot
 //                SHIFT + ON/OFF disables all three effect slots.
 //      * 32 beat jump forward & back (Shift + </> CUE/LOOP CALL arrows)
-//      * Toggle quantize (Shift + channel cue)
+//      * Select next channel QuickEffect preset (Shift + channel cue)
 //
 //  Not implemented (after discussion and trial attempts):
 //      * Loop Section:
@@ -167,10 +167,10 @@ PioneerDDJ400.init = function() {
 
     engine.softTakeover("[Channel1]", "rate", true);
     engine.softTakeover("[Channel2]", "rate", true);
-    engine.softTakeover("[EffectRack1_EffectUnit1_Effect1]", "meta", true);
-    engine.softTakeover("[EffectRack1_EffectUnit1_Effect2]", "meta", true);
-    engine.softTakeover("[EffectRack1_EffectUnit1_Effect3]", "meta", true);
+    engine.softTakeover("[EffectRack1_EffectUnit1]", "super1", true);
     engine.softTakeover("[EffectRack1_EffectUnit1]", "mix", true);
+    engine.softTakeover("[QuickEffectRack1_[Channel1]]", "super1", true);
+    engine.softTakeover("[QuickEffectRack1_[Channel2]]", "super1", true);
 
     const samplerCount = 16;
     if (engine.getValue("[App]", "num_samplers") < samplerCount) {
@@ -238,11 +238,11 @@ PioneerDDJ400.focusedFxGroup = function() {
 
 PioneerDDJ400.beatFxLevelDepthRotate = function(_channel, _control, value) {
     if (PioneerDDJ400.shiftButtonDown[0] || PioneerDDJ400.shiftButtonDown[1]) {
-        engine.softTakeoverIgnoreNextValue("[EffectRack1_EffectUnit1]", "mix");
-        engine.setParameter(PioneerDDJ400.focusedFxGroup(), "meta", value / 0x7F);
-    } else {
-        engine.softTakeoverIgnoreNextValue(PioneerDDJ400.focusedFxGroup(), "meta");
+        engine.softTakeoverIgnoreNextValue("[EffectRack1_EffectUnit1]", "super1");
         engine.setParameter("[EffectRack1_EffectUnit1]", "mix", value / 0x7F);
+    } else {
+        engine.softTakeoverIgnoreNextValue("[EffectRack1_EffectUnit1]", "mix");
+        engine.setParameter("[EffectRack1_EffectUnit1]", "super1", value / 0x7F);
     }
 };
 
@@ -643,12 +643,6 @@ PioneerDDJ400.stopSamplerBlink = function(channel, control) {
 //
 // Additional features
 //
-
-PioneerDDJ400.toggleQuantize = function(_channel, _control, value, _status, group) {
-    if (value) {
-        script.toggleControl(group, "quantize");
-    }
-};
 
 PioneerDDJ400.quickJumpForward = function(_channel, _control, value, _status, group) {
     if (value) {
