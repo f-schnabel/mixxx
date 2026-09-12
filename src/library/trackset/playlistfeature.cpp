@@ -1,7 +1,9 @@
 #include "library/trackset/playlistfeature.h"
 
+#include <QHash>
 #include <QMenu>
 #include <QSqlTableModel>
+#include <QStringList>
 #include <QtDebug>
 
 #include "library/library.h"
@@ -18,6 +20,12 @@
 #include "widget/wlibrary.h"
 #include "widget/wlibrarysidebar.h"
 #include "widget/wtracktableview.h"
+
+namespace {
+
+const QString kRekordboxPlaylistPrefix = QStringLiteral("[Rekordbox] ");
+
+} // namespace
 
 PlaylistFeature::PlaylistFeature(Library* pLibrary, UserSettingsPointer pConfig)
         : BasePlaylistFeature(pLibrary,
@@ -58,6 +66,9 @@ void PlaylistFeature::onRightClickChild(
     //Save the model index so we can get it in the action slots...
     m_lastRightClickedIndex = index;
     int playlistId = playlistIdFromIndex(index);
+    if (playlistId == kInvalidPlaylistId) {
+        return;
+    }
 
     bool locked = m_playlistDao.isPlaylistLocked(playlistId);
     m_pDeletePlaylistAction->setEnabled(!locked);
@@ -94,6 +105,9 @@ void PlaylistFeature::onRightClickChild(
 bool PlaylistFeature::dropAcceptChild(
         const QModelIndex& index, const QList<QUrl>& urls, QObject* pSource) {
     int playlistId = playlistIdFromIndex(index);
+    if (playlistId == kInvalidPlaylistId) {
+        return false;
+    }
     VERIFY_OR_DEBUG_ASSERT(playlistId >= 0) {
         return false;
     }
@@ -114,6 +128,9 @@ bool PlaylistFeature::dropAcceptChild(
 
 bool PlaylistFeature::dragMoveAcceptChild(const QModelIndex& index, const QUrl& url) {
     int playlistId = playlistIdFromIndex(index);
+    if (playlistId == kInvalidPlaylistId) {
+        return false;
+    }
     bool locked = m_playlistDao.isPlaylistLocked(playlistId);
 
     bool formatSupported = SoundSourceProxy::isUrlSupported(url) ||
@@ -242,17 +259,41 @@ void PlaylistFeature::slotShufflePlaylist() {
 QModelIndex PlaylistFeature::constructChildModel(int selectedId) {
     // qDebug() << "PlaylistFeature::constructChildModel() id:" << selectedId;
     std::vector<std::unique_ptr<TreeItem>> childrenToAdd;
-    int selectedRow = -1;
-
-    int row = 0;
+    std::unique_ptr<TreeItem> pRekordboxRoot;
+    QHash<QString, TreeItem*> rekordboxFolders;
     const QList<IdAndLabel> playlistLabels = createPlaylistLabels();
     for (const auto& idAndLabel : playlistLabels) {
         int playlistId = idAndLabel.id;
         QString playlistLabel = idAndLabel.label;
 
-        if (selectedId == playlistId) {
-            // save index for selection
-            selectedRow = row;
+        const QString playlistName = m_playlistDao.getPlaylistName(playlistId);
+        if (playlistName.startsWith(kRekordboxPlaylistPrefix)) {
+            const QString relativeName = playlistName.mid(kRekordboxPlaylistPrefix.size());
+            const QStringList parts = relativeName.split(QStringLiteral(" / "), Qt::SkipEmptyParts);
+            if (!parts.isEmpty()) {
+                if (!pRekordboxRoot) {
+                    pRekordboxRoot = std::make_unique<TreeItem>(QStringLiteral("Rekordbox"));
+                }
+                TreeItem* pParent = pRekordboxRoot.get();
+                QString folderPath;
+                for (int i = 0; i + 1 < parts.size(); ++i) {
+                    folderPath = folderPath.isEmpty()
+                            ? parts[i]
+                            : folderPath + QStringLiteral(" / ") + parts[i];
+                    TreeItem* pFolder = rekordboxFolders.value(folderPath, nullptr);
+                    if (!pFolder) {
+                        pFolder = pParent->appendChild(parts[i]);
+                        rekordboxFolders.insert(folderPath, pFolder);
+                    }
+                    pParent = pFolder;
+                }
+                const QString countAndDuration = playlistLabel.mid(playlistName.size());
+                TreeItem* pItem = pParent->appendChild(
+                        parts.constLast() + countAndDuration, playlistId);
+                pItem->setBold(m_playlistIdsOfSelectedTrack.contains(playlistId));
+                decorateChild(pItem, playlistId);
+                continue;
+            }
         }
 
         // Create the TreeItem whose parent is the invisible root item
@@ -261,16 +302,15 @@ QModelIndex PlaylistFeature::constructChildModel(int selectedId) {
 
         decorateChild(pItem.get(), playlistId);
         childrenToAdd.push_back(std::move(pItem));
+    }
 
-        ++row;
+    if (pRekordboxRoot) {
+        childrenToAdd.insert(childrenToAdd.begin(), std::move(pRekordboxRoot));
     }
 
     // Append all the newly created TreeItems in a dynamic way to the childmodel
     m_pSidebarModel->insertTreeItemRows(std::move(childrenToAdd), 0);
-    if (selectedRow == -1) {
-        return QModelIndex();
-    }
-    return m_pSidebarModel->index(selectedRow, 0);
+    return indexFromPlaylistId(selectedId);
 }
 
 void PlaylistFeature::decorateChild(TreeItem* item, int playlistId) {

@@ -775,33 +775,22 @@ void BasePlaylistFeature::updateChildModel(const QSet<int>& playlistIds) {
         return;
     }
 
-    int id = kInvalidPlaylistId;
-    QString label;
-    bool ok = false;
-
-    for (int row = 0; row < m_pSidebarModel->rowCount(); ++row) {
-        QModelIndex index = m_pSidebarModel->index(row, 0);
+    for (int playlistId : playlistIds) {
+        const QModelIndex index = indexFromPlaylistId(playlistId);
+        if (!index.isValid()) {
+            continue;
+        }
         TreeItem* pTreeItem = m_pSidebarModel->getItem(index);
         DEBUG_ASSERT(pTreeItem != nullptr);
-        if (pTreeItem->hasChildren()) {
-            for (TreeItem* pChild : pTreeItem->children()) {
-                id = pChild->getData().toInt(&ok);
-                if (ok && id != kInvalidPlaylistId && playlistIds.contains(id)) {
-                    label = fetchPlaylistLabel(id);
-                    pChild->setLabel(label);
-                    decorateChild(pChild, id);
-                    markTreeItem(pChild);
-                }
-            }
-        } else {
-            id = pTreeItem->getData().toInt(&ok);
-            if (ok && id != kInvalidPlaylistId && playlistIds.contains(id)) {
-                label = fetchPlaylistLabel(id);
-                pTreeItem->setLabel(label);
-                decorateChild(pTreeItem, id);
-                markTreeItem(pTreeItem);
-            }
+        QString label = fetchPlaylistLabel(playlistId);
+        if (pTreeItem->parent() && !pTreeItem->parent()->isRoot()) {
+            const QString playlistName = m_playlistDao.getPlaylistName(playlistId);
+            label = playlistName.section(QStringLiteral(" / "), -1) +
+                    label.mid(playlistName.size());
         }
+        pTreeItem->setLabel(label);
+        decorateChild(pTreeItem, playlistId);
+        markTreeItem(pTreeItem);
     }
     m_pSidebarModel->triggerRepaint();
 }
