@@ -425,6 +425,11 @@ void MidiController::processInputMapping(const MidiInputMapping& mapping,
                 newValue = static_cast<double>(iValue) / 128.0;
                 newValue = math_min(newValue, 127.0);
 
+                // Apply invert option to 14-bit controls
+                if (mapping.options.testFlag(MidiOption::Invert)) {
+                    newValue = 127.0 - newValue;
+                }
+
                 // Erase the queued message since we processed it.
                 constErase(&m_fourteen_bit_queued_mappings, it);
 
