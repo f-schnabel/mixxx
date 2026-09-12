@@ -28,6 +28,7 @@
             <SignalRGBMidColor></SignalRGBMidColor>
             <SignalRGBLowColor></SignalRGBLowColor>
             <BeatColor><Variable name="BeatColor"/></BeatColor>
+            <DownbeatColor>#ff3030</DownbeatColor>
             <AxesColor><Variable name="AxesColor"/></AxesColor>
             <BeatHighlightColor></BeatHighlightColor>
             <PlayPosColor><Variable name="PlayPosColor"/></PlayPosColor>

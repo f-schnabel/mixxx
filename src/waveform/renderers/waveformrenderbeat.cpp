@@ -9,6 +9,23 @@
 
 class QPaintEvent;
 
+namespace {
+
+int firstBeatNumber(const mixxx::Beats& beats) {
+    constexpr int kDefaultFirstBeat = 1;
+    const QString key = QStringLiteral("first_beat=");
+    const QString subVersion = beats.getSubVersion();
+    const qsizetype start = subVersion.indexOf(key);
+    if (start < 0) {
+        return kDefaultFirstBeat;
+    }
+    bool ok = false;
+    const int value = subVersion.mid(start + key.size()).section(';', 0, 0).toInt(&ok);
+    return ok && value >= 1 && value <= 4 ? value : kDefaultFirstBeat;
+}
+
+} // namespace
+
 WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidgetRenderer)
         : WaveformRendererAbstract(waveformWidgetRenderer) {
     m_beats.resize(128);
@@ -20,6 +37,11 @@ WaveformRenderBeat::~WaveformRenderBeat() {
 void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& context) {
     m_beatColor = QColor(context.selectString(node, "BeatColor"));
     m_beatColor = WSkinColor::getCorrectColor(m_beatColor).toRgb();
+    m_downbeatColor = QColor(context.selectString(node, "DownbeatColor"));
+    if (!m_downbeatColor.isValid()) {
+        m_downbeatColor = QColor(QStringLiteral("#ff3030"));
+    }
+    m_downbeatColor = WSkinColor::getCorrectColor(m_downbeatColor).toRgb();
 }
 
 void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
@@ -43,8 +65,10 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     // drawing with QPainter on the QOpenGLWindow: instead of individual lines
     // a large rectangle encompassing all beatlines is drawn.
     m_beatColor.setAlphaF(1.f);
+    m_downbeatColor.setAlphaF(1.f);
 #else
     m_beatColor.setAlphaF(alpha/100.0);
+    m_downbeatColor.setAlphaF(alpha / 100.0);
 #endif
 
     const double trackSamples = m_waveformRenderer->getTrackSamples();
@@ -87,6 +111,9 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     const float rendererHeight = m_waveformRenderer->getHeight();
 
     int beatCount = 0;
+    int downbeatCount = 0;
+    const int firstBeat = firstBeatNumber(*trackBeats);
+    const auto firstMarker = trackBeats->cfirstmarker();
 
     for (; it != trackBeats->cend() && *it <= endPosition; ++it) {
         double beatPosition = it->toEngineSamplePos();
@@ -100,13 +127,30 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
             m_beats.resize(m_beats.size() * 2);
         }
 
+        const bool isDownbeat = ((it - firstMarker) + firstBeat - 1) % 4 == 0;
+        if (isDownbeat && downbeatCount >= m_downbeats.size()) {
+            m_downbeats.resize(m_downbeats.isEmpty() ? 128 : m_downbeats.size() * 2);
+        }
+
         if (orientation == Qt::Horizontal) {
-            m_beats[beatCount++].setLine(xBeatPoint, 0.0f, xBeatPoint, rendererHeight);
+            const QLineF line(xBeatPoint, 0.0f, xBeatPoint, rendererHeight);
+            m_beats[beatCount++] = line;
+            if (isDownbeat) {
+                m_downbeats[downbeatCount++] = line;
+            }
         } else {
-            m_beats[beatCount++].setLine(0.0f, xBeatPoint, rendererWidth, xBeatPoint);
+            const QLineF line(0.0f, xBeatPoint, rendererWidth, xBeatPoint);
+            m_beats[beatCount++] = line;
+            if (isDownbeat) {
+                m_downbeats[downbeatCount++] = line;
+            }
         }
     }
 
     // Make sure to use constData to prevent detaches!
     painter->drawLines(m_beats.constData(), beatCount);
+    QPen downbeatPen(m_downbeatColor);
+    downbeatPen.setWidthF(std::max(2.0, scaleFactor() * 2));
+    painter->setPen(downbeatPen);
+    painter->drawLines(m_downbeats.constData(), downbeatCount);
 }

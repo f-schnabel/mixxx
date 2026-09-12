@@ -10,6 +10,23 @@
 
 namespace allshader {
 
+namespace {
+
+int firstBeatNumber(const mixxx::Beats& beats) {
+    constexpr int kDefaultFirstBeat = 1;
+    const QString key = QStringLiteral("first_beat=");
+    const QString subVersion = beats.getSubVersion();
+    const qsizetype start = subVersion.indexOf(key);
+    if (start < 0) {
+        return kDefaultFirstBeat;
+    }
+    bool ok = false;
+    const int value = subVersion.mid(start + key.size()).section(';', 0, 0).toInt(&ok);
+    return ok && value >= 1 && value <= 4 ? value : kDefaultFirstBeat;
+}
+
+} // namespace
+
 WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidget,
         ::WaveformRendererAbstract::PositionSource type)
         : WaveformRenderer(waveformWidget),
@@ -24,6 +41,11 @@ void WaveformRenderBeat::initializeGL() {
 void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& context) {
     m_color = QColor(context.selectString(node, "BeatColor"));
     m_color = WSkinColor::getCorrectColor(m_color).toRgb();
+    m_downbeatColor = QColor(context.selectString(node, "DownbeatColor"));
+    if (!m_downbeatColor.isValid()) {
+        m_downbeatColor = QColor(QStringLiteral("#ff3030"));
+    }
+    m_downbeatColor = WSkinColor::getCorrectColor(m_downbeatColor).toRgb();
 }
 
 void WaveformRenderBeat::paintGL() {
@@ -52,6 +74,7 @@ void WaveformRenderBeat::paintGL() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_color.setAlphaF(alpha / 100.0f);
+    m_downbeatColor.setAlphaF(alpha / 100.0f);
 
     const double trackSamples = m_waveformRenderer->getTrackSamples();
     if (trackSamples <= 0) {
@@ -90,7 +113,11 @@ void WaveformRenderBeat::paintGL() {
     const int reserved = numBeatsInRange * numVerticesPerLine;
     m_vertices.clear();
     m_vertices.reserve(reserved);
+    m_downbeatVertices.clear();
+    m_downbeatVertices.reserve((numBeatsInRange / 4 + 1) * numVerticesPerLine);
 
+    const int firstBeat = firstBeatNumber(*trackBeats);
+    const auto firstMarker = trackBeats->cfirstmarker();
     for (auto it = trackBeats->iteratorFrom(startPosition);
             it != trackBeats->cend() && *it <= endPosition;
             ++it) {
@@ -108,6 +135,12 @@ void WaveformRenderBeat::paintGL() {
                 0.f,
                 x2,
                 m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth);
+        if (((it - firstMarker) + firstBeat - 1) % 4 == 0) {
+            m_downbeatVertices.addRectangle(x1,
+                    0.f,
+                    x1 + 2.f,
+                    m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth);
+        }
     }
 
     DEBUG_ASSERT(reserved == m_vertices.size());
@@ -128,6 +161,13 @@ void WaveformRenderBeat::paintGL() {
     m_shader.setUniformValue(colorLocation, m_color);
 
     glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
+
+    if (m_downbeatVertices.size() > 0) {
+        m_shader.setAttributeArray(
+                positionLocation, GL_FLOAT, m_downbeatVertices.constData(), 2);
+        m_shader.setUniformValue(colorLocation, m_downbeatColor);
+        glDrawArrays(GL_TRIANGLES, 0, m_downbeatVertices.size());
+    }
 
     m_shader.disableAttributeArray(positionLocation);
     m_shader.release();
