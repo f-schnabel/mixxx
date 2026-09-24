@@ -1,4 +1,5 @@
 #include <QApplication>
+// Throwaway: change src hash to test ccache restore from main
 #include <QDir>
 #include <QPixmapCache>
 #include <QString>
