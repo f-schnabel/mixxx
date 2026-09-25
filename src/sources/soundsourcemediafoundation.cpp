@@ -134,7 +134,7 @@ SoundSource::OpenResult SoundSourceMediaFoundation::tryOpen(
     }
     // Initialize the Media Foundation platform.
     m_hrMFStartup = MFStartup(MF_VERSION);
-    if (FAILED(m_hrCoInitialize)) {
+    if (FAILED(m_hrMFStartup)) {
         kLogger.warning()
                 << "failed to initialize Media Foundation";
         return OpenResult::Failed;
@@ -386,11 +386,11 @@ ReadableSampleFrames SoundSourceMediaFoundation::readSampleFramesClamped(
                     << "detected stream errors"
                     << "(MF_SOURCE_READERF_ERROR)"
                     << "-> abort and stop decoding";
-            DEBUG_ASSERT(pSample == nullptr);
+            safeRelease(&pSample);
             safeRelease(&m_pSourceReader); // kill the reader
             break;                         // abort
         } else if (dwFlags & MF_SOURCE_READERF_ENDOFSTREAM) {
-            DEBUG_ASSERT(pSample == nullptr);
+            safeRelease(&pSample);
             break; // finished reading
         } else if (dwFlags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) {
             kLogger.warning()
@@ -398,10 +398,18 @@ ReadableSampleFrames SoundSourceMediaFoundation::readSampleFramesClamped(
                     << "detected that the media type has changed"
                     << "(MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED)"
                     << "-> abort decoding";
-            DEBUG_ASSERT(pSample == nullptr);
+            safeRelease(&pSample);
             break; // abort
         }
-        DEBUG_ASSERT(pSample != nullptr);
+        if (pSample == nullptr) {
+            // [AI-generated comment, Claude Code: start]
+            // IMFSourceReader::ReadSample() may succeed without returning
+            // a sample, e.g. for MF_SOURCE_READERF_STREAMTICK. Dereferencing
+            // the null pointer would crash with an access violation.
+            // https://learn.microsoft.com/en-us/windows/win32/api/mfreadwrite/nf-mfreadwrite-imfsourcereader-readsample
+            // [AI-generated comment, Claude Code: end]
+            continue; // read next sample
+        }
         SINT readerFrameIndex = m_streamUnitConverter.toFrameIndex(streamPos);
         // TODO: Fix debug assertion in else arm. It has been commented
         // out deliberately to prevent crashes in debug builds.
