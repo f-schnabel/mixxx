@@ -389,9 +389,8 @@ class WaveformWidgetFactory : public QObject,
             WaveformRendererSignalBase::Options option);
     WaveformWidgetAbstract* createRGBWaveformWidget(WWaveformViewer* viewer,
             WaveformRendererSignalBase::Options option);
-    WaveformWidgetAbstract* createStackedWaveformWidget(WWaveformViewer* viewer,
-            WaveformRendererSignalBase::Options option);
-    WaveformWidgetAbstract* createRGB3BandWaveformWidget(WWaveformViewer* viewer,
+    WaveformWidgetAbstract* createAllshaderOnlyWaveformWidget(WaveformWidgetType::Type type,
+            WWaveformViewer* viewer,
             WaveformRendererSignalBase::Options option);
     WaveformWidgetAbstract* createSimpleWaveformWidget(WWaveformViewer* viewer,
             WaveformRendererSignalBase::Options option);

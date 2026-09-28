@@ -1218,30 +1218,19 @@ WaveformWidgetAbstract* WaveformWidgetFactory::createRGBWaveformWidget(
     }
 }
 
-WaveformWidgetAbstract* WaveformWidgetFactory::createStackedWaveformWidget(
-        WWaveformViewer* viewer, WaveformRendererSignalBase::Options options) {
+WaveformWidgetAbstract* WaveformWidgetFactory::createAllshaderOnlyWaveformWidget(
+        WaveformWidgetType::Type type,
+        WWaveformViewer* viewer,
+        WaveformRendererSignalBase::Options options) {
 #ifdef MIXXX_USE_QOPENGL
-    WaveformWidgetBackend backend = getBackendFromConfig();
-    switch (backend) {
-    case WaveformWidgetBackend::AllShader:
-        return createAllshaderWaveformWidget(WaveformWidgetType::Type::Stacked, viewer, options);
-#endif
-    default:
-        return new EmptyWaveformWidget(viewer->getGroup(), viewer);
+    if (getBackendFromConfig() == WaveformWidgetBackend::AllShader) {
+        return createAllshaderWaveformWidget(type, viewer, options);
     }
-}
-
-WaveformWidgetAbstract* WaveformWidgetFactory::createRGB3BandWaveformWidget(
-        WWaveformViewer* viewer, WaveformRendererSignalBase::Options options) {
-#ifdef MIXXX_USE_QOPENGL
-    WaveformWidgetBackend backend = getBackendFromConfig();
-    switch (backend) {
-    case WaveformWidgetBackend::AllShader:
-        return createAllshaderWaveformWidget(WaveformWidgetType::Type::RGB3Band, viewer, options);
+#else
+    Q_UNUSED(type);
+    Q_UNUSED(options);
 #endif
-    default:
-        return new EmptyWaveformWidget(viewer->getGroup(), viewer);
-    }
+    return new EmptyWaveformWidget(viewer->getGroup(), viewer);
 }
 
 WaveformWidgetAbstract* WaveformWidgetFactory::createSimpleWaveformWidget(
@@ -1296,10 +1285,8 @@ WaveformWidgetAbstract* WaveformWidgetFactory::createWaveformWidget(
             pWidget = createRGBWaveformWidget(pViewer, options);
             break;
         case WaveformWidgetType::Stacked:
-            pWidget = createStackedWaveformWidget(pViewer, options);
-            break;
         case WaveformWidgetType::RGB3Band:
-            pWidget = createRGB3BandWaveformWidget(pViewer, options);
+            pWidget = createAllshaderOnlyWaveformWidget(type, pViewer, options);
             break;
         default:
             pWidget = new EmptyWaveformWidget(pViewer->getGroup(), pViewer);
