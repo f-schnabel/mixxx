@@ -177,38 +177,39 @@ jobs:
       - name: Set up problem matcher
         uses: ammaraskar/gcc-problem-matcher@0.3.0
       - name: Generate sources (moc, uic, gitinfo.h)
-        # mixxx-lib_autogen also builds the dependencies that provide headers
-        # (protobuf, libdjinterop, ...). The other autogen targets are built
-        # with /fast because e.g. mixxx-test_autogen depends on mixxx-lib,
-        # which would compile all of it.
+        # mixxx-lib_autogen also builds the libraries that generate headers
+        # (protobuf, libdjinterop, ...). /fast skips the dependencies of
+        # mixxx-test, otherwise all of mixxx-lib would be compiled.
         run: |
-          cmake --build . --target mixxx-lib_autogen mixxx-gitinfo -j $(nproc)
-          targets=$(cmake --build . --target help | sed -n 's/^\.\.\. \(.*_autogen\)$/\1\/fast/p')
-          cmake --build . --target $targets -j $(nproc)
+          cmake --build . -j $(nproc) --target mixxx-lib_autogen mixxx-gitinfo
+          cmake --build . -j $(nproc) --target mixxx-test_autogen/fast
         working-directory: build
-      - name: Run clang-tidy
+      - name: Select files
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          # Files that are part of the build
-          jq -r '.[].file' build/compile_commands.json | sort -u > all_files.txt
-          grep -F "$PWD/src/" all_files.txt > src_files.txt
-          full=true
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            git diff --name-only --diff-filter=d HEAD^1 HEAD > changed.txt
-            # Changes to the configuration or the build can affect every file
-            if ! grep -qE '^(\.clang-tidy$|cmake/|\.github/workflows/checks\.yml$)|(^|/)CMakeLists\.txt$' changed.txt; then
-              full=false
-              # Changed sources, plus the sources next to changed headers
-              awk '/^src\/.*\.cpp$/ {print} /^src\/.*\.h$/ {sub(/\.h$/, ".cpp"); print}' changed.txt \
-                | sed "s|^|$PWD/|" | sort -u | comm -12 - src_files.txt > files.txt
-            fi
-          fi
-          if [ "$full" = "true" ]; then
-            cp src_files.txt files.txt
+          # All mixxx sources in the compilation database
+          jq -r '.[].file' build/compile_commands.json | grep "^$PWD/src/" | sort -u > all.txt
+
+          # Pull requests only check changed files, unless they change the
+          # clang-tidy configuration or the build
+          git diff --name-only HEAD^1 HEAD > changed.txt
+          if [ "$EVENT_NAME" = "pull_request" ] && ! grep -qE \
+              -e '^\.clang-tidy$' \
+              -e '(^|/)CMakeLists\.txt$' \
+              -e '^cmake/' \
+              -e '^\.github/workflows/checks\.yml$' \
+              changed.txt; then
+            # Changed sources, and the source next to each changed header
+            sed -e 's/\.h$/.cpp/' -e "s|^|$PWD/|" changed.txt > candidates.txt
+            grep --fixed-strings --line-regexp --file=candidates.txt all.txt > files.txt || true
+          else
+            cp all.txt files.txt
           fi
           echo "Checking $(wc -l < files.txt) file(s)"
-          # xargs exits with 123 if clang-tidy failed for any file
-          xargs -r -a files.txt -P "$(nproc)" -n 1 \
-            clang-tidy -p build --quiet --warnings-as-errors='*'
+      - name: Run clang-tidy
+        # Fails if clang-tidy reports anything in any file
+        run: >-
+          xargs --no-run-if-empty --arg-file=files.txt --max-procs=$(nproc) --max-args=1
+          clang-tidy -p build --quiet --warnings-as-errors='*'
