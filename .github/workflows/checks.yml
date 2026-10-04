@@ -121,13 +121,55 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-jammy.list
           sudo apt-get update
           sudo apt-get install -y --allow-downgrades libc6=2.35* libc6-dev=2.35* libstdc++6=12.3.0* libgcc-s1=12.3.0*
+      - name: Restore ccache cache
+        # Caches are only saved by push builds (see "Save ccache cache").
+        # Pull requests can read caches of their base branch, but caches they
+        # save are only visible to themselves and evict the base branch caches
+        # from the 10 GB repository quota.
+        id: ccache_cache
+        if: matrix.name != 'clang-tidy'
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/ccache
+          # Key by source state (not run number). This workflow is part of the
+          # key because clazy hashes it via CCACHE_EXTRAFILES, an exact hit
+          # would otherwise keep a stale cache that is never saved again.
+          key: ubuntu-22.04-${{ matrix.name }}-${{ github.head_ref || github.ref_name }}-${{ hashFiles('src/**', 'CMakeLists.txt', 'cmake/**', '.github/workflows/checks.yml') }}
+          restore-keys: |
+            ubuntu-22.04-${{ matrix.name }}-${{ github.head_ref || github.ref_name }}
+            ubuntu-22.04-${{ matrix.name }}-${{ github.base_ref }}
+            ubuntu-22.04-${{ matrix.name }}
+      - name: Set up ccache
+        if: matrix.name != 'clang-tidy'
+        run: |
+          ccache --zero-stats
+          ccache --max-size=2G
       - name: Build
         # Do not abort on errors and build/check the whole project
         run: cmake --build . -j $(nproc) -- --keep-going
         working-directory: build
         env:
+          # clazy is a clang wrapper that ccache does not recognize by name
+          CCACHE_COMPILERTYPE: ${{ matrix.name == 'clazy' && 'clang' || 'auto' }}
+          # ccache does not see CLAZY_CHECKS and CLAZY_IGNORE_DIRS below. Hashing
+          # this file makes changes to them invalidate cached objects.
+          CCACHE_EXTRAFILES: ${{ matrix.name == 'clazy' && format('{0}/.github/workflows/checks.yml', github.workspace) || '' }}
+          # Identify clazy by version, its plugin is not part of the wrapper script
+          CCACHE_COMPILERCHECK: ${{ matrix.name == 'clazy' && '%compiler% --version' || 'mtime' }}
           CLAZY_CHECKS: level2,container-inside-loop,heap-allocated-small-trivial-type,isempty-vs-count,qhash-with-char-pointer-key,qproperty-type-mismatch,tr-non-literal,no-rule-of-two-soft,no-non-pod-global-static,no-qproperty-without-notify,no-qstring-allocations,no-function-args-by-value,no-copyable-polymorphic,no-ctor-missing-parent-argument,no-missing-qobject-macro,no-rule-of-three,no-returning-void-expression
           CLAZY_IGNORE_DIRS: lib/.*
+      - name: Print ccache stats
+        if: ${{ !cancelled() && matrix.name != 'clang-tidy' }}
+        run: |
+          ccache --show-stats
+          ccache --cleanup
+      - name: Save ccache cache
+        # Also save after failed builds, objects of the files that compiled are still valid
+        if: ${{ !cancelled() && matrix.name != 'clang-tidy' && steps.ccache_cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref_type == 'branch' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ccache
+          key: ${{ steps.ccache_cache.outputs.cache-primary-key }}
       - name: "Test"
         if: matrix.name == 'coverage'
         run: ctest --timeout 45
