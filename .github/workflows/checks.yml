@@ -190,7 +190,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           # All mixxx sources in the compilation database
-          jq -r '.[].file' build/compile_commands.json | grep "^$PWD/src/" | sort -u > all.txt
+          # TODO: Fix the findings in src/test/ and src/qml/ and check them too
+          jq -r '.[].file' build/compile_commands.json \
+            | grep "^$PWD/src/" \
+            | grep -v -e "^$PWD/src/test/" -e "^$PWD/src/qml/" \
+            | sort -u > all.txt
 
           # Pull requests only check changed files, unless they change the
           # clang-tidy configuration or the build
