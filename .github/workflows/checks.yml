@@ -184,9 +184,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --allow-downgrades libc6=2.35* libc6-dev=2.35* libstdc++6=12.3.0* libgcc-s1=12.3.0*
       - name: Generate sources (moc, uic, gitinfo.h)
+        # mixxx-lib_autogen also builds the dependencies that provide headers
+        # (protobuf, libdjinterop, ...). The other autogen targets are built
+        # with /fast because e.g. mixxx-test_autogen depends on mixxx-lib,
+        # which would compile all of it.
         run: |
-          targets=$(cmake --build . --target help | sed -n 's/^\.\.\. \(.*_autogen\)$/\1/p')
-          cmake --build . --target $targets mixxx-gitinfo -j $(nproc)
+          cmake --build . --target mixxx-lib_autogen mixxx-gitinfo -j $(nproc)
+          targets=$(cmake --build . --target help | sed -n 's/^\.\.\. \(.*_autogen\)$/\1\/fast/p')
+          cmake --build . --target $targets -j $(nproc)
         working-directory: build
       - name: Run clang-tidy
         shell: bash
