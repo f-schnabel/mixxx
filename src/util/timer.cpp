@@ -9,6 +9,8 @@ Timer::Timer(QString key, Stat::ComputeFlags compute)
 }
 
 void Timer::start() {
+    void* p = NULL;
+    Q_UNUSED(p);
     m_time.start();
 }
 

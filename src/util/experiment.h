@@ -1,3 +1,4 @@
+// clang-tidy CI header test
 #pragma once
 
 #include <QtDebug>
