@@ -179,7 +179,7 @@ jobs:
           ccache --show-stats
           ccache --cleanup
           if [ "${{ matrix.name }}" = clang-tidy ]; then
-            ctcache/clang-tidy --show-stats
+            python3 ctcache/src/ctcache/clang_tidy_cache.py --show-stats
           fi
       - name: Save cache
         id: ccache_save
