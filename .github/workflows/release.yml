@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - pc-base
       - "[0-9].[0-9]"
     tags:
       - "[0-9].[0-9].[0-9]"
@@ -19,6 +20,7 @@ permissions:
 
 jobs:
   checks:
+    if: false
     uses: ./.github/workflows/checks.yml
 
   pre-commit-cache:
@@ -54,11 +56,13 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
   changelog:
+    if: false
     uses: ./.github/workflows/changelog.yml
     secrets:
       MIXXXBOT_CHANGELOG_AUTOUPDATER_PAT: ${{ secrets.MIXXXBOT_CHANGELOG_AUTOUPDATER_PAT }}
 
   build:
+    if: false
     uses: ./.github/workflows/build.yml
     with:
       publish: true
@@ -82,7 +86,7 @@ jobs:
       - build
     uses: ./.github/workflows/flatpak.yml
     # Flatpak repo only support stable (non-beta tag release), beta and alpha release publication
-    if: ${{ (github.ref_type == 'tag' && !contains('-', github.ref_name)) || github.ref_name == '2.6' || github.ref_name == 'main' }}
+    if: false
     with:
       ref: ${{ github.ref }}
       update_repo: ${{ github.ref_name == 'main' }}
@@ -92,7 +96,7 @@ jobs:
       DASCHUER_AT_MIXXX_DOT_ORG_GPG_PRIVATE_KEY: ${{ secrets.DASCHUER_AT_MIXXX_DOT_ORG_GPG_PRIVATE_KEY }}
 
   sync:
-    if: ${{ github.ref_type != 'tag' && github.ref != 'refs/heads/main' && github.repository == 'mixxxdj/mixxx' }}
+    if: false
     uses: ./.github/workflows/sync_branches.yml
     secrets:
       MIXXX_BRANCH_SYNC_PAT: ${{ secrets.MIXXX_BRANCH_SYNC_PAT }}

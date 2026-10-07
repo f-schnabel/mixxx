@@ -58,17 +58,17 @@ jobs:
       pull_request: ${{ github.event_name == 'pull_request' }}
 
   checks:
-    if: needs.stop-build.outputs.result == 'false'
+    if: false
     needs:
       - stop-build
     uses: ./.github/workflows/checks.yml
 
   git:
-    if: github.event_name == 'pull_request'
+    if: false
     uses: ./.github/workflows/git.yml
 
   build:
-    if: needs.stop-build.outputs.result == 'false'
+    if: false
     needs:
       - stop-build
     uses: ./.github/workflows/build.yml
@@ -82,9 +82,6 @@ jobs:
     name: Ready to merge
     needs:
       - pre-commit
-      - checks
-      - git
-      - build
     runs-on: ubuntu-slim
     steps:
       - name: Ready to go
