@@ -154,9 +154,11 @@ jobs:
       - name: Set up ctcache
         if: matrix.name == 'clang-tidy'
         run: |
-          echo "CTCACHE_DIR=$HOME/.cache/ctcache" >> "$GITHUB_ENV"
+          export CTCACHE_DIR="$HOME/.cache/ctcache"
+          echo "CTCACHE_DIR=$CTCACHE_DIR" >> "$GITHUB_ENV"
           # Store clang-tidy's output, so cache hits still report findings
           echo "CTCACHE_SAVE_OUTPUT=1" >> "$GITHUB_ENV"
+          python3 ctcache/src/ctcache/clang_tidy_cache.py --zero-stats
       - name: Set up ccache for clazy
         if: matrix.name == 'clazy'
         run: |
